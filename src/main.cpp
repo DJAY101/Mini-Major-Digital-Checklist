@@ -77,7 +77,7 @@ void buttonClicked() {
 
 
 
-
+IPAddress IP;
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(112500);
@@ -86,6 +86,7 @@ void setup() {
 
   rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
   rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
+  rotaryEncoder.setEncoderInvert(true);
 
 
   // Connect to Wi-Fi network with SSID and password
@@ -93,7 +94,7 @@ void setup() {
   // Remove the password parameter, if you want the AP (Access Point) to be open
   WiFi.softAP(ssid, password);
 
-  IPAddress IP = WiFi.softAPIP();
+  IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
 
@@ -151,6 +152,10 @@ std::vector<String> splitString(String text, String splitCharacter) {
 
 }
 
+void decodeHTMLString(String* text) {
+  text->replace("%20", " ");
+}
+
 void WifiLoopCode(void * pvParameters) {
 
   
@@ -190,17 +195,42 @@ void WifiLoopCode(void * pvParameters) {
               m_client.println("Content-type:text/html");
               m_client.println("Connection: close");
               m_client.println();
+
+
+
+              decodeHTMLString(&GetRequest);
+
+              if(splitString(GetRequest, "/").at(0) == "edit") {
+                std::vector<String> parts = splitString(GetRequest, "/");
+                tasks->at(parts.at(1).toInt())->setTask(parts.at(2));
+                taskRenderer->refreshTable();
+              }
+
               
               m_client.println("<!DOCTYPE html><html>");
               m_client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
               m_client.println("<link rel=\"icon\" href=\"data:,\">");
-              m_client.println("<div style=\"background-color: rgb(76,57,235);\"><h style=\"color:white;\"><center> DIGI-DoIT </center></h></div>");
-              m_client.println("<a href=\"/open\">Hello World!</a>");
+              m_client.println("<div style=\"background-color: rgb(76,57,235);\"><h style=\"color:white;font-size:30px;\"><center> DIGI-DoIT </center></h></div>");
+
+
+
               for (int i = 0; i < m_tasks->size(); i++) {
-                m_client.println("<h3><a href=/" + String(i) + ">" + m_tasks->at(i)->getTask() +"</a></h3>");
+                m_client.println("<h2>" + m_tasks->at(i)->getTask() +"</h2>");
               }
-              
-              if (GetRequest.length() > 1) {tasks->at(splitString(GetRequest, "/").at(0).toInt())->setComplete(true); taskRenderer->refreshTable(); m_client.println("<h1>YOU OPENNED" + tasks->at(splitString(GetRequest, "/").at(0).toInt())->getTask() + "</h1>");}
+              m_client.println("<h1>TASK ID</h1>");
+              m_client.println("<input id=\"taskID\">");
+              m_client.println("<h1>New task detail</h1>");
+              m_client.println("<input id=\"taskInput\">");
+              m_client.println("<h3>Submit</h3>");
+              m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">CHANGE</button>");
+
+              //JavaScript
+              m_client.println("<script type=\"text/javascript\">");
+              m_client.println("function clickAction() {fetch(\"/edit/\"+taskID.value+\"/\"+taskInput.value).then(res=>{location.replace(\"/Complete!\");})}");
+              m_client.println("submit.onclick = clickAction;");
+
+
+              m_client.println("</script>");
 
               m_client.println();
               Serial.println("Sent HTML Data");
@@ -216,10 +246,6 @@ void WifiLoopCode(void * pvParameters) {
             currentLine += c;
           }
       }
-
-
-
-
 
     }
 
