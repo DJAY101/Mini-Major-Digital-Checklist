@@ -41,7 +41,7 @@ Arduino_GFX *gfx = create_default_Arduino_GFX();
 Arduino_DataBus *bus = new Arduino_ESP32SPI(17 /* DC */, 5 /* CS */, 18 /* SCK */, 23 /* MOSI */, -1 /* MISO */, VSPI /* spi_num */);
 
 /* More display class: https://github.com/moononournation/Arduino_GFX/wiki/Display-Class */
-Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, 4 /* RST */, 3 /* rotation */, false /* IPS */);
+Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, 4 /* RST */, 1 /* rotation */, false /* IPS */);
 
 #endif /* !defined(DISPLAY_DEV_KIT) */
 
@@ -140,7 +140,7 @@ std::vector<String> splitString(String text, String splitCharacter) {
     if (text[i] == splitCharacter[0] && parts.length() > 0) {
       returnVal.emplace_back(parts);
       parts = "";
-    } else if(i == text.length()-1) {
+    } else if(i == text.length()-1 && text[i] != splitCharacter[0]) {
       parts += text[i];
       returnVal.emplace_back(parts);
     } 
@@ -148,6 +148,8 @@ std::vector<String> splitString(String text, String splitCharacter) {
       parts += text[i];
     }
   }
+  //if there is not splits found then return -1
+  if (returnVal.size() == 0) {returnVal.emplace_back("-1");}
   return returnVal;
 
 }
@@ -199,38 +201,85 @@ void WifiLoopCode(void * pvParameters) {
 
 
               decodeHTMLString(&GetRequest);
-
-              if(splitString(GetRequest, "/").at(0) == "edit") {
+              std::vector<String> getRequestSplit = splitString(GetRequest, "/");
+              if(getRequestSplit.at(0) == "edit") {
                 std::vector<String> parts = splitString(GetRequest, "/");
                 tasks->at(parts.at(1).toInt())->setTask(parts.at(2));
+                tasks->at(parts.at(1).toInt())->setComplete((parts.at(3)=="true")? true:false);
                 taskRenderer->refreshTable();
+              } else if (getRequestSplit.at(0) == "create") {
+                Task* temp = new Task(getRequestSplit.at(1));
+                tasks->emplace_back(temp);
+                taskRenderer->refreshTable();
+
               }
+
 
               
               m_client.println("<!DOCTYPE html><html>");
               m_client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
               m_client.println("<link rel=\"icon\" href=\"data:,\">");
               m_client.println("<div style=\"background-color: rgb(76,57,235);\"><h style=\"color:white;font-size:30px;\"><center> DIGI-DoIT </center></h></div>");
+              if(getRequestSplit.at(0) == "-1"){
+                Serial.println("Get request is size zero!");
+                m_client.println("<script type=\"text/javascript\">");
+                m_client.println("location.replace(\"/homePage\");");
+                m_client.println("</script>");
+              }else if(getRequestSplit.at(0) == "editPage") {
+                m_client.println("<a href=\"/homePage\"><h1>Back home!</h1></a>");
+                m_client.println("<h1>TASK ID:" + getRequestSplit.at(1) + "</h1>");
+                m_client.println("<h1>New task detail</h1>");
+                m_client.println("<input id=\"taskInput\" value=\"" + tasks->at(getRequestSplit.at(1).toInt())->getTask() + "\">");
+                m_client.println("<input type=\"checkbox\" id=\"taskComplete\" name=\"check1\">");
+                m_client.println("<label for=\"check1\">Task Completed</label><br>");
+                m_client.println("<h3>Submit</h3>");
+                m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">CHANGE</button>");
 
+                //JavaScript
+                m_client.println("<script type=\"text/javascript\">");
 
+                m_client.println("function clickAction() {if(taskComplete.checked) {fetch(\"/edit/" + getRequestSplit.at(1) + "/\"+taskInput.value+\"/true\").then(res=>{location.replace(\"/homePage\");})} else {fetch(\"/edit/" + getRequestSplit.at(1) + "/\"+taskInput.value+\"/false\").then(res=>{location.replace(\"/homePage\");})};}");
+                m_client.println("submit.onclick = clickAction;");
 
-              for (int i = 0; i < m_tasks->size(); i++) {
-                m_client.println("<h2>" + m_tasks->at(i)->getTask() +"</h2>");
+                m_client.println("</script>");
+
+              } else if (getRequestSplit.at(0) == "homePage") {
+                m_client.println("<h1>Current Editable Tasks:</h1>");
+                for (int i = 0; i < m_tasks->size(); i++) {
+                  m_client.println("<h2><a href=\"/editPage/"+ String(i) +"\">" + m_tasks->at(i)->getTask() +"</a></h2>");
+                }
+                m_client.println("<h1><a href=\"createPage\">Add new task!</a></h1>");
+
+              } else if (getRequestSplit.at(0) == "createPage") {
+                m_client.println("<a href=\"/homePage\"><h1>Back home!</h1></a>");
+                m_client.println("<h1>Create a new task!</h1>");
+                m_client.println("<h2>Enter task details: </h2>");
+                m_client.println("<input id=\"taskInput\">");
+                m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">Create</button>");
+
+                m_client.println("<script type=\"text/javascript\">");
+
+                m_client.println("function clickAction() {if(taskInput.value.length > 1) {fetch(\"/create/\"+taskInput.value).then(res => {location.replace(\"/homePage\");});} } ");
+                m_client.println("submit.onclick = clickAction;");
+                m_client.println("</script>");
+
               }
-              m_client.println("<h1>TASK ID</h1>");
-              m_client.println("<input id=\"taskID\">");
-              m_client.println("<h1>New task detail</h1>");
-              m_client.println("<input id=\"taskInput\">");
-              m_client.println("<h3>Submit</h3>");
-              m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">CHANGE</button>");
-
-              //JavaScript
-              m_client.println("<script type=\"text/javascript\">");
-              m_client.println("function clickAction() {fetch(\"/edit/\"+taskID.value+\"/\"+taskInput.value).then(res=>{location.replace(\"/Complete!\");})}");
-              m_client.println("submit.onclick = clickAction;");
 
 
-              m_client.println("</script>");
+              // m_client.println("<h1>TASK ID</h1>");
+              // m_client.println("<input id=\"taskID\">");
+              // m_client.println("<h1>New task detail</h1>");
+              // m_client.println("<input id=\"taskInput\">");
+              // m_client.println("<h3>Submit</h3>");
+              // m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">CHANGE</button>");
+
+              // //JavaScript
+              // m_client.println("<script type=\"text/javascript\">");
+              // m_client.println("function clickAction() {fetch(\"/edit/\"+taskID.value+\"/\"+taskInput.value).then(res=>{location.replace(\"/Complete!\");})}");
+              // m_client.println("submit.onclick = clickAction;");
+
+
+              // m_client.println("</script>");
 
               m_client.println();
               Serial.println("Sent HTML Data");
