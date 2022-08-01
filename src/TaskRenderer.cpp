@@ -62,6 +62,7 @@ TaskRenderer::TaskRenderer(Arduino_GFX* gfx, std::vector<Task*>* tasks){
 }
 
 void TaskRenderer::init() {
+    //initialise the table renderer
     m_gfx->fillScreen(BLACK);
     for(int i = 0; i < (m_displayHeight/m_taskRenderHeight); i++) {
         if (i < m_tasks->size()){
@@ -74,11 +75,13 @@ void TaskRenderer::init() {
 }
 
 void TaskRenderer::taskChangedRender(int taskElement, bool selected) {
-
+    //when a task is changed or a cell needs to be re rendered this gets called
     int element = std::find(m_currentElementsRendered.begin(), m_currentElementsRendered.end(), taskElement) - m_currentElementsRendered.begin();
     m_cells.at(element)->clear();
+    if (taskElement < m_tasks->size()){
     m_cells.at(element)->Set(m_tasks->at(taskElement)->getTask(), m_tasks->at(taskElement)->getComplete(), selected);
     m_cells.at(element)->render();
+    }
 
 }
 
@@ -87,15 +90,79 @@ void TaskRenderer::refreshTable() {
     m_currentElementsRendered.clear();
     int tempCounter{0};
     for (auto cell : m_cells) {
-        taskChangedRender(m_scrollOffset+tempCounter, (m_scrollOffset+tempCounter == m_selectedElement)?true:false);
-        m_currentElementsRendered.emplace_back(m_scrollOffset+tempCounter);
+        taskChangedRender(m_scrollOffset*3+tempCounter, (m_scrollOffset*3+tempCounter == m_selectedElement)?true:false);
+        m_currentElementsRendered.emplace_back(m_scrollOffset*3+tempCounter);
         tempCounter++;
     }
 }
 
-void TaskRenderer::updateRender(int selectedElement) {
+void TaskRenderer::checkPreviousTask() {
+    //completes the task previously selected
+    if(!m_tasks->at(m_selectedElement)->getComplete()) {
+        m_tasks->at(m_selectedElement)->setComplete(true);
+        taskChangedRender(m_selectedElement, false);
+    }
 
+}
+
+bool TaskRenderer::allTasksComplete() {
+    //check if all the tasks are compelted
+    for (auto task : *m_tasks){
+        if (!task->getComplete()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void TaskRenderer::allTaskCompletedAnim() {
+
+    //run the finished all tasks aniamtion
+    if (!allTasksComplete()) return;
+
+    m_gfx->fillScreen(BLACK);
+    bool animationRunning{true};
+    int x_center = m_displayWidth/2;
+    int y_center = m_displayHeight/2;
+    int outerCircleRad = 120;
+    int innerCircleRad = 90;
+    float angle = -90;
+    float targetAngle = 270;
+
+    float v1{0.469};
+    float v2{0.484};
+    float v3{0.044};
+    float v4{0.03};
+
+    while (animationRunning) {
+        m_gfx->drawLine(innerCircleRad*cos(angle*M_PI/180) + x_center, innerCircleRad*sin(angle*M_PI/180) + y_center, outerCircleRad*cos(angle*M_PI/180) + x_center, outerCircleRad*sin(angle*M_PI/180) + y_center, WHITE);
+        if (angle < targetAngle) {
+            float PC = (angle+abs(angle))/(270+abs(angle)); //percentage complete for bezier curve
+            float bezierAnimVal = pow(1-PC, 3)*v1 + 3*PC*(1-PC, 2)*v2 + 3*pow(PC, 2)*(1-PC)*v3 + pow(PC, 3)*v4; //bezier curve for animation time completion
+            angle += 0.1*m_animDeltaTime*0.00005;
+        } else {animationRunning = false;}
+        m_animDeltaTime = millis() - m_animDeltaTime;
+
+    }
+    m_gfx->drawBitmap(0, 0, tickIcon, 480, 320, GREEN);
+
+    for (auto task:*m_tasks) {
+        task->setComplete(false);
+    }
+
+    m_selectedElement = 0;
+    m_scrollOffset = 0;
+    delay(1000);
+    refreshTable();
+
+}
+
+
+
+void TaskRenderer::updateRender(int selectedElement) {
+    //render a new page
     if (std::find(m_currentElementsRendered.begin(), m_currentElementsRendered.end(), selectedElement) != m_currentElementsRendered.end()) {
+        checkPreviousTask();
         int element;
         //remove old arrow
         element = std::find(m_currentElementsRendered.begin(), m_currentElementsRendered.end(), m_selectedElement) - m_currentElementsRendered.begin();
@@ -107,33 +174,34 @@ void TaskRenderer::updateRender(int selectedElement) {
         m_selectedElement = selectedElement;
         return;
     } 
-    //one steps update
+    //one steps update when no new page is required to be rendered
     if (abs(selectedElement-m_selectedElement)==1) {
+        checkPreviousTask();
         m_scrollOffset += selectedElement-m_selectedElement;
         int tempCounter{0};
         m_currentElementsRendered.clear();
         for (auto cell : m_cells) {
-
-            taskChangedRender(m_scrollOffset+tempCounter, (selectedElement-m_selectedElement == 1) ? ((tempCounter==m_cells.size()-1)?true:false) :((tempCounter==0)?true:false));
-            m_currentElementsRendered.emplace_back(m_scrollOffset+tempCounter);
+            
+            taskChangedRender(m_scrollOffset*3+tempCounter, (selectedElement-m_selectedElement == -1) ? ((tempCounter==m_cells.size()-1)?true:false) :((tempCounter==0)?true:false));
+            m_currentElementsRendered.emplace_back(m_scrollOffset*3+tempCounter);
             tempCounter++;
         }
         m_selectedElement = selectedElement;
         return;
     }
     //jumping from bottom to top vice versa
-    if (abs(selectedElement-m_selectedElement) > 1) {
-        m_scrollOffset = (selectedElement-m_selectedElement > 0) ? m_tasks->size()-m_cells.size() : 0;
-        int tempCounter{0};
-        m_currentElementsRendered.clear();
-        for (auto cell : m_cells) {
-            taskChangedRender(m_scrollOffset+tempCounter, (selectedElement-m_selectedElement > 0) ? ((tempCounter==m_cells.size()-1)?true:false) : ((tempCounter==0)?true:false));
-            m_currentElementsRendered.emplace_back(m_scrollOffset+tempCounter);
-            tempCounter++;
-        }
-        m_selectedElement = selectedElement;
-        return;
-    }
+    // if (abs(selectedElement-m_selectedElement) > 1) {
+    //     m_scrollOffset = (selectedElement-m_selectedElement > 0) ? m_tasks->size()-m_cells.size() : 0;
+    //     int tempCounter{0};
+    //     m_currentElementsRendered.clear();
+    //     for (auto cell : m_cells) {
+    //         taskChangedRender(m_scrollOffset+tempCounter, (selectedElement-m_selectedElement > 0) ? ((tempCounter==m_cells.size()-1)?true:false) : ((tempCounter==0)?true:false));
+    //         m_currentElementsRendered.emplace_back(m_scrollOffset+tempCounter);
+    //         tempCounter++;
+    //     }
+    //     m_selectedElement = selectedElement;
+    //     return;
+    // }
 
 
 }

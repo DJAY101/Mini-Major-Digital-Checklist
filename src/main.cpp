@@ -29,6 +29,7 @@ const int ROT_PIN_PUSH_BUT = 22;
 
 CFRotaryEncoder rotaryEncoder(ROT_PIN_OUTPUT_A, ROT_PIN_OUTPUT_B, ROT_PIN_PUSH_BUT);                        // Rotary Endoder.
 
+const int displayBrightnessPin = 33;
 
 #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 
@@ -58,21 +59,24 @@ void encoderChanged() {
   if (rotaryEncoder.getValue() != rotaryEncoder.getLastValue()) {
     int value = rotaryEncoder.getValue();
     if (value == -1) {
-      rotaryEncoder.setValue(tasks->size()-1);
-    }
-    else if (value > tasks->size()-1) {
       rotaryEncoder.setValue(0);
     }
- 
-  taskRenderer->updateRender(rotaryEncoder.getValue());
+    else if (value > tasks->size()-1) {
+      rotaryEncoder.setValue(tasks->size()-1);
+      taskRenderer->updateRender(rotaryEncoder.getValue());
 
+    } else {
+      taskRenderer->updateRender(rotaryEncoder.getValue());
+    }
   }
 }
 
 void buttonClicked() {
   Serial.print("Finished");
-  tasks->at(rotaryEncoder.getValue())->setComplete(!tasks->at(rotaryEncoder.getValue())->getComplete());
-  taskRenderer->taskChangedRender(rotaryEncoder.getValue(), true);
+  // tasks->at(rotaryEncoder.getValue())->setComplete(!tasks->at(rotaryEncoder.getValue())->getComplete());
+  // taskRenderer->taskChangedRender(rotaryEncoder.getValue(), true);
+  taskRenderer->allTaskCompletedAnim();
+  rotaryEncoder.setValue(0);
 }
 
 
@@ -87,6 +91,8 @@ void setup() {
   rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
   rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
   rotaryEncoder.setEncoderInvert(true);
+  pinMode(displayBrightnessPin, OUTPUT);
+  digitalWrite(displayBrightnessPin, HIGH);
 
 
   // Connect to Wi-Fi network with SSID and password
@@ -112,7 +118,6 @@ void setup() {
   Task* task5 = new Task("Task 5");
   Task* task6 = new Task("Task 6");
   
-  task3->setComplete(true);
   tasks->emplace_back(task1);
   tasks->emplace_back(task2);
   tasks->emplace_back(task3);
