@@ -4,12 +4,15 @@
 #include <CFRotaryEncoder.h>
 
 #include <WiFi.h>
+#include <Preferences.h>
 
 #include <vector>
 
 
 #include <Task.h>
 #include <TaskRenderer.h>
+
+#include <brightnessController.h>
 
 //Wifi Name & Password
 const char* ssid     = "Digi-Checklist";
@@ -50,6 +53,7 @@ Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, 4 /* RST */, 1 /* rotation */,
  * End of Arduino_GFX setting
  ******************************************************************************/
 
+BrightnessController brightnessController(displayBrightnessPin, 5000);
 
 TaskRenderer* taskRenderer;
 std::vector<Task*>* tasks;
@@ -57,6 +61,7 @@ std::vector<Task*>* tasks;
 void encoderChanged() {
 
   if (rotaryEncoder.getValue() != rotaryEncoder.getLastValue()) {
+    brightnessController.interacted();
     int value = rotaryEncoder.getValue();
     if (value == -1) {
       rotaryEncoder.setValue(0);
@@ -80,63 +85,6 @@ void buttonClicked() {
 }
 
 
-
-IPAddress IP;
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(112500);
-  gfx->begin();
-  gfx->setTextSize(5, 5, 1);
-
-  rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
-  rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
-  rotaryEncoder.setEncoderInvert(true);
-  pinMode(displayBrightnessPin, OUTPUT);
-  digitalWrite(displayBrightnessPin, HIGH);
-
-
-  // Connect to Wi-Fi network with SSID and password
-  Serial.print("Setting AP (Access Point)…");
-  // Remove the password parameter, if you want the AP (Access Point) to be open
-  WiFi.softAP(ssid, password);
-
-  IP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(IP);
-
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-  WiFi.setHostname(hostname.c_str()); //define hostname
-  
-  server.begin();
-
-
-  tasks = new std::vector<Task*>;
-  Task* task1 = new Task("Task 1");
-  Task* task2 = new Task("Task 2");
-  Task* task3 = new Task("Task 3");
-  Task* task4 = new Task("Task 4");
-  Task* task5 = new Task("Task 5");
-  Task* task6 = new Task("Task 6");
-  
-  tasks->emplace_back(task1);
-  tasks->emplace_back(task2);
-  tasks->emplace_back(task3);
-  tasks->emplace_back(task4);
-  tasks->emplace_back(task5);
-  tasks->emplace_back(task6);
-
-  taskRenderer = new TaskRenderer(gfx, tasks);
-  taskRenderer->init();
-}
-
-
-struct wifiData{
-  std::vector<Task*>* tasks;
-  WiFiClient* client;
-  TaskRenderer* taskRenderer;
-
-};
-
 std::vector<String> splitString(String text, String splitCharacter) {
   std::vector<String> returnVal;
 
@@ -158,6 +106,80 @@ std::vector<String> splitString(String text, String splitCharacter) {
   return returnVal;
 
 }
+
+
+Preferences preferences;
+IPAddress IP;
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(112500);
+  gfx->begin();
+  gfx->setTextSize(5, 5, 1);
+
+  rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
+  rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
+  rotaryEncoder.setEncoderInvert(true);
+  //pinMode(displayBrightnessPin, OUTPUT);
+  //digitalWrite(displayBrightnessPin, HIGH);
+
+
+  // Connect to Wi-Fi network with SSID and password
+  Serial.print("Setting AP (Access Point)…");
+  // Remove the password parameter, if you want the AP (Access Point) to be open
+  WiFi.softAP(ssid, password);
+
+  IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  WiFi.setHostname(hostname.c_str()); //define hostname
+  
+  server.begin();
+
+  preferences.begin("savedData", false); //setup the database to read locally
+
+
+  tasks = new std::vector<Task*>;
+
+  //grab saved data
+  String data = preferences.getString("Data", "");
+  //load saved data into vector for tasks
+  std::vector<String> dataSplit = splitString(data, ",");
+  if (dataSplit[0] != "-1") {
+    for (String taskName: dataSplit){
+      Task* temp = new Task(taskName);
+      tasks->emplace_back(temp);
+    }
+  }
+
+  // Task* task1 = new Task("Task 1");
+  // Task* task2 = new Task("Task 2");
+  // Task* task3 = new Task("Task 3");
+  // Task* task4 = new Task("Task 4");
+  // Task* task5 = new Task("Task 5");
+  // Task* task6 = new Task("Task 6");
+  
+  // tasks->emplace_back(task1);
+  // tasks->emplace_back(task2);
+  // tasks->emplace_back(task3);
+  // tasks->emplace_back(task4);
+  // tasks->emplace_back(task5);
+  // tasks->emplace_back(task6);
+
+  taskRenderer = new TaskRenderer(gfx, tasks);
+  taskRenderer->init();
+}
+
+
+struct wifiData{
+  std::vector<Task*>* tasks;
+  WiFiClient* client;
+  TaskRenderer* taskRenderer;
+
+};
+
+
 
 void decodeHTMLString(String* text) {
   text->replace("%20", " ");
@@ -209,12 +231,47 @@ void WifiLoopCode(void * pvParameters) {
               std::vector<String> getRequestSplit = splitString(GetRequest, "/");
               if(getRequestSplit.at(0) == "edit") {
                 std::vector<String> parts = splitString(GetRequest, "/");
+
+                String currentData = preferences.getString("Data");
+                preferences.clear();
+                std::vector<String> splitData = splitString(currentData, ",");
+                splitData.at(parts.at(1).toInt()) = parts.at(2);
+                currentData = "";
+                for (auto taskName : splitData) {
+                  currentData += "," + taskName;
+                }
+                preferences.putString("Data", currentData);
+
                 tasks->at(parts.at(1).toInt())->setTask(parts.at(2));
                 tasks->at(parts.at(1).toInt())->setComplete((parts.at(3)=="true")? true:false);
                 taskRenderer->refreshTable();
               } else if (getRequestSplit.at(0) == "create") {
+                String currentData = preferences.getString("Data");
+
+                preferences.clear();
+                currentData = currentData + "," + getRequestSplit.at(1);
+                preferences.putString("Data", currentData);
+
                 Task* temp = new Task(getRequestSplit.at(1));
                 tasks->emplace_back(temp);
+                taskRenderer->refreshTable();
+
+              } else if (getRequestSplit.at(0) == "delete") {
+
+                String currentData = preferences.getString("Data");
+                preferences.clear();
+                std::vector<String> splitData = splitString(currentData, ",");
+                splitData.erase(splitData.begin()+getRequestSplit.at(1).toInt());
+                currentData="";
+                for (auto taskName : splitData) {
+                  currentData += "," + taskName;
+                }
+                preferences.putString("Data", currentData);
+
+                Task* toBeDeletedTask = tasks->at(getRequestSplit.at(1).toInt());
+                tasks->erase(tasks->begin()+getRequestSplit.at(1).toInt());
+                delete toBeDeletedTask;
+
                 taskRenderer->refreshTable();
 
               }
@@ -239,12 +296,15 @@ void WifiLoopCode(void * pvParameters) {
                 m_client.println("<label for=\"check1\">Task Completed</label><br>");
                 m_client.println("<h3>Submit</h3>");
                 m_client.println("<button id=\"submit\" style=\"font-size = 20px;\">CHANGE</button>");
+                m_client.println("<button id=\"deleteB\" style=\"font-size = 20px;\">DELETE</button>");
 
                 //JavaScript
                 m_client.println("<script type=\"text/javascript\">");
 
                 m_client.println("function clickAction() {if(taskComplete.checked) {fetch(\"/edit/" + getRequestSplit.at(1) + "/\"+taskInput.value+\"/true\").then(res=>{location.replace(\"/homePage\");})} else {fetch(\"/edit/" + getRequestSplit.at(1) + "/\"+taskInput.value+\"/false\").then(res=>{location.replace(\"/homePage\");})};}");
                 m_client.println("submit.onclick = clickAction;");
+                m_client.println("function deleteAction() { fetch(\"/delete/"+ getRequestSplit.at(1) +"\").then(res=>{location.replace(\"/homePage\");}); }");
+                m_client.println("deleteB.onclick = deleteAction;");
 
                 m_client.println("</script>");
 
@@ -315,6 +375,7 @@ WiFiClient client;
 void loop() {
   // put your main code here, to run repeatedly:
   rotaryEncoder.loop();
+  brightnessController.update();
 
   if (xTaskGetHandle("Wifi") == NULL){
      client = server.available();

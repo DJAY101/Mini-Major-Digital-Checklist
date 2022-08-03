@@ -17,23 +17,23 @@ void CellRender::setSelected(bool selected) {
     m_selected = selected;
     if (m_selected) {
         drawThickRectangle(m_x, m_y, m_renderWidth, m_renderHeight, m_selectedBorderColour, borderThickness);
-        drawArrow(m_renderWidth-40, m_y+(m_renderHeight/2), 50, m_arrowColour);
+        drawArrow(m_renderWidth-20, m_y+(m_renderHeight/2), 50, m_arrowColour);
     } else {
         drawThickRectangle(m_x, m_y, m_renderWidth, m_renderHeight, m_borderColour, borderThickness);
-        drawArrow(m_renderWidth-40, m_y+(m_renderHeight/2), 50, (m_completed) ? m_completedColour : m_backgroundColour);
+        drawArrow(m_renderWidth-20, m_y+(m_renderHeight/2), 50, (m_completed) ? m_completedColour : m_backgroundColour);
     }
 }
 
 void CellRender::render() {
     if (m_completed) {
-        m_gfx->fillRect(m_x, m_y, m_renderWidth, m_renderHeight, m_completedColour);
+        m_gfx->fillRect(m_renderWidth*3/4, m_y, m_renderWidth/4, m_renderHeight, m_completedColour);
     }
     if (m_selected) {
         drawThickRectangle(m_x, m_y, m_renderWidth, m_renderHeight, m_selectedBorderColour, borderThickness);
-        drawArrow(m_renderWidth-40, m_y+(m_renderHeight/2), 50, m_arrowColour);
+        drawArrow(m_renderWidth-20, m_y+(m_renderHeight/2), 50, m_arrowColour);
     } else {
         drawThickRectangle(m_x, m_y, m_renderWidth, m_renderHeight, m_borderColour, borderThickness);
-        drawArrow(m_renderWidth-40, m_y+(m_renderHeight/2), 50, (m_completed) ? m_completedColour : m_backgroundColour);
+        drawArrow(m_renderWidth-20, m_y+(m_renderHeight/2), 50, (m_completed) ? m_completedColour : m_backgroundColour);
     }
     m_gfx->setCursor(10, m_y + (m_renderHeight/4));
     m_gfx->println(m_content);
@@ -65,11 +65,20 @@ void TaskRenderer::init() {
     //initialise the table renderer
     m_gfx->fillScreen(BLACK);
     for(int i = 0; i < (m_displayHeight/m_taskRenderHeight); i++) {
-        if (i < m_tasks->size()){
-            CellRender* temp = new CellRender(m_gfx, 0, m_taskRenderHeight*i, m_tasks->at(i)->getTask(), m_taskRenderHeight, m_displayWidth, (i==0) ? true : false, m_tasks->at(i)->getComplete());
-            temp->render();
-            m_cells.emplace_back(temp);
-            m_currentElementsRendered.emplace_back(i);
+        if (i < 3){
+            //if there is data to render then render
+            if (i < m_tasks->size()) {
+                CellRender* temp = new CellRender(m_gfx, 0, m_taskRenderHeight*i, m_tasks->at(i)->getTask(), m_taskRenderHeight, m_displayWidth, (i==0) ? true : false, m_tasks->at(i)->getComplete());
+                temp->render();
+                m_cells.emplace_back(temp);
+                m_currentElementsRendered.emplace_back(i);
+            } else {
+                //otherwise just add empty cells
+                CellRender* temp = new CellRender(m_gfx, 0, m_taskRenderHeight*i, "", m_taskRenderHeight, m_displayWidth, false, false);
+                temp->render();
+                m_cells.emplace_back(temp);
+                m_currentElementsRendered.emplace_back(i);
+            }
         } else break;
     }
 }
