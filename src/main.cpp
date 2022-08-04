@@ -17,7 +17,6 @@
 //Wifi Name & Password
 const char* ssid     = "Digi-Checklist";
 const char* password = "123456789";
-String hostname = "CheckList";
 
 // Set web server port number to 80
 WiFiServer server(80);
@@ -53,7 +52,7 @@ Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, 4 /* RST */, 1 /* rotation */,
  * End of Arduino_GFX setting
  ******************************************************************************/
 
-BrightnessController brightnessController(displayBrightnessPin, 5000);
+BrightnessController brightnessController(displayBrightnessPin, 10000);
 
 TaskRenderer* taskRenderer;
 std::vector<Task*>* tasks;
@@ -63,14 +62,18 @@ void encoderChanged() {
   if (rotaryEncoder.getValue() != rotaryEncoder.getLastValue()) {
     brightnessController.interacted();
     int value = rotaryEncoder.getValue();
-    if (value == -1) {
-      rotaryEncoder.setValue(0);
+    if (value <= -1) {
+      taskRenderer->renderNetworkInfo(password, ssid);
+      rotaryEncoder.setValue(-1);
     }
     else if (value > tasks->size()-1) {
       rotaryEncoder.setValue(tasks->size()-1);
       taskRenderer->updateRender(rotaryEncoder.getValue());
 
-    } else {
+    } else if (rotaryEncoder.getValue() == 0 && rotaryEncoder.getLastValue()== -1) {
+      taskRenderer->refreshTable();
+    }
+     else {
       taskRenderer->updateRender(rotaryEncoder.getValue());
     }
   }
@@ -114,8 +117,8 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(112500);
   gfx->begin();
-  gfx->setTextSize(5, 5, 1);
-
+  gfx->setTextSize(3, 3, 1);
+  
   rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
   rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
   rotaryEncoder.setEncoderInvert(true);
@@ -127,14 +130,13 @@ void setup() {
   Serial.print("Setting AP (Access Point)…");
   // Remove the password parameter, if you want the AP (Access Point) to be open
   WiFi.softAP(ssid, password);
-
+  
   IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
 
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-  WiFi.setHostname(hostname.c_str()); //define hostname
-  
+    
   server.begin();
 
   preferences.begin("savedData", false); //setup the database to read locally
@@ -152,20 +154,6 @@ void setup() {
       tasks->emplace_back(temp);
     }
   }
-
-  // Task* task1 = new Task("Task 1");
-  // Task* task2 = new Task("Task 2");
-  // Task* task3 = new Task("Task 3");
-  // Task* task4 = new Task("Task 4");
-  // Task* task5 = new Task("Task 5");
-  // Task* task6 = new Task("Task 6");
-  
-  // tasks->emplace_back(task1);
-  // tasks->emplace_back(task2);
-  // tasks->emplace_back(task3);
-  // tasks->emplace_back(task4);
-  // tasks->emplace_back(task5);
-  // tasks->emplace_back(task6);
 
   taskRenderer = new TaskRenderer(gfx, tasks);
   taskRenderer->init();

@@ -10,6 +10,8 @@
 
 #include <bitmap.h>
 
+#include <WiFi.h>
+
 
 class CellRender {
 
@@ -59,6 +61,8 @@ class TaskRenderer {
     void checkPreviousTask();
     bool allTasksComplete();
     void allTaskCompletedAnim();
+
+    void renderNetworkInfo(String WifiPass, String WifiName);
 
     void refreshTable();
 

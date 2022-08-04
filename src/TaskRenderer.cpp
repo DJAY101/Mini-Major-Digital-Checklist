@@ -138,22 +138,22 @@ void TaskRenderer::allTaskCompletedAnim() {
     float angle = -90;
     float targetAngle = 270;
 
-    float v1{0.469};
-    float v2{0.484};
-    float v3{0.044};
-    float v4{0.03};
+
+    hw_timer_t* m_animTimer;
+    m_animTimer = timerBegin(1, 80, true);
 
     while (animationRunning) {
         m_gfx->drawLine(innerCircleRad*cos(angle*M_PI/180) + x_center, innerCircleRad*sin(angle*M_PI/180) + y_center, outerCircleRad*cos(angle*M_PI/180) + x_center, outerCircleRad*sin(angle*M_PI/180) + y_center, WHITE);
         if (angle < targetAngle) {
-            float PC = (angle+abs(angle))/(270+abs(angle)); //percentage complete for bezier curve
-            float bezierAnimVal = pow(1-PC, 3)*v1 + 3*PC*(1-PC, 2)*v2 + 3*pow(PC, 2)*(1-PC)*v3 + pow(PC, 3)*v4; //bezier curve for animation time completion
-            angle += 0.1*m_animDeltaTime*0.00005;
+            angle += 0.1*0.005*timerReadMicros(m_animTimer);
+            timerWrite(m_animTimer, 0);
         } else {animationRunning = false;}
-        m_animDeltaTime = millis() - m_animDeltaTime;
+
 
     }
     m_gfx->drawBitmap(0, 0, tickIcon, 480, 320, GREEN);
+
+    timerStop(m_animTimer);
 
     for (auto task:*m_tasks) {
         task->setComplete(false);
@@ -161,9 +161,16 @@ void TaskRenderer::allTaskCompletedAnim() {
 
     m_selectedElement = 0;
     m_scrollOffset = 0;
-    delay(1000);
+    delay(1500);
     refreshTable();
 
+}
+
+
+void TaskRenderer::renderNetworkInfo(String WifiPass, String WifiName) {
+    m_gfx->fillScreen(BLACK);
+    m_gfx->setCursor(0, 0);
+    m_gfx->print("Wifi Name: " + WifiName + "\nWifi Password: " + WifiPass + "\nIP: "+ WiFi.softAPIP().toString());
 }
 
 
