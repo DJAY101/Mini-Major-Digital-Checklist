@@ -35,8 +35,22 @@ void CellRender::render() {
         drawThickRectangle(m_x, m_y, m_renderWidth, m_renderHeight, m_borderColour, borderThickness);
         drawArrow(m_renderWidth-20, m_y+(m_renderHeight/2), 50, (m_completed) ? m_completedColour : m_backgroundColour);
     }
+    m_gfx->setTextSize(5, 5, 1);
+    if (m_content.length() >= 12) {
+          m_gfx->setTextSize(4, 4, 1);
+    } else if (m_content.length() >= 15) {
+          m_gfx->setTextSize(3, 3, 1);
+    }
+
     m_gfx->setCursor(10, m_y + (m_renderHeight/4));
+    if (m_content.length() >= 15) {
+        m_gfx->println(m_content.substring(0, 15));
+        m_gfx->setCursor(10, m_y + (m_renderHeight/4)+40);
+        m_gfx->println(m_content.substring(15));
+
+    } else {
     m_gfx->println(m_content);
+    }
 }
 
 
@@ -168,6 +182,7 @@ void TaskRenderer::allTaskCompletedAnim() {
 
 
 void TaskRenderer::renderNetworkInfo(String WifiPass, String WifiName) {
+    m_gfx->setTextSize(3, 3, 1);
     m_gfx->fillScreen(BLACK);
     m_gfx->setCursor(0, 0);
     m_gfx->print("Wifi Name: " + WifiName + "\nWifi Password: " + WifiPass + "\nIP: "+ WiFi.softAPIP().toString());

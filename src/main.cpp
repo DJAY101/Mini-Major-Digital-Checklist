@@ -117,7 +117,6 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(112500);
   gfx->begin();
-  gfx->setTextSize(3, 3, 1);
   
   rotaryEncoder.setAfterRotaryChangeValueCallback(encoderChanged);
   rotaryEncoder.setPushButtonOnPressCallback(buttonClicked);
@@ -318,7 +317,6 @@ void WifiLoopCode(void * pvParameters) {
 
               }
 
-
               // m_client.println("<h1>TASK ID</h1>");
               // m_client.println("<input id=\"taskID\">");
               // m_client.println("<h1>New task detail</h1>");
@@ -331,13 +329,9 @@ void WifiLoopCode(void * pvParameters) {
               // m_client.println("function clickAction() {fetch(\"/edit/\"+taskID.value+\"/\"+taskInput.value).then(res=>{location.replace(\"/Complete!\");})}");
               // m_client.println("submit.onclick = clickAction;");
 
-
               // m_client.println("</script>");
-
               m_client.println();
               Serial.println("Sent HTML Data");
-
-
 
               m_client.stop();
               vTaskDelete(NULL);
@@ -348,11 +342,8 @@ void WifiLoopCode(void * pvParameters) {
             currentLine += c;
           }
       }
-
     }
-
     vTaskDelete(NULL);
-
   }
 }
 
