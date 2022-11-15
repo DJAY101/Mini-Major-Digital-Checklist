@@ -262,8 +262,6 @@ void WifiLoopCode(void * pvParameters) {
                 taskRenderer->refreshTable();
 
               }
-
-
               
               m_client.println("<!DOCTYPE html><html>");
               m_client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
@@ -277,7 +275,7 @@ void WifiLoopCode(void * pvParameters) {
               }else if(getRequestSplit.at(0) == "editPage") {
                 m_client.println("<a href=\"/homePage\"><h1>Back home!</h1></a>");
                 m_client.println("<h1>TASK ID:" + getRequestSplit.at(1) + "</h1>");
-                m_client.println("<h1>New task detail</h1>");
+                m_client.println("<h1>Edit Task Name</h1>");
                 m_client.println("<input id=\"taskInput\" value=\"" + tasks->at(getRequestSplit.at(1).toInt())->getTask() + "\">");
                 m_client.println("<input type=\"checkbox\" id=\"taskComplete\" name=\"check1\">");
                 m_client.println("<label for=\"check1\">Task Completed</label><br>");
